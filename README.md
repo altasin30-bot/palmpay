@@ -114,4 +114,4 @@ The Flask server also serves the built React app, so one URL opens the whole sof
 
 ## Online demo deployment (Render)
 ...
-- Live URL: - Live URL: https://palmpay-gfmm.onrender.com
+Live URL: https://palmpay-gfmm.onrender.com
