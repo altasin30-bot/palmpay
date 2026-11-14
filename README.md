@@ -111,3 +111,7 @@ The Flask server also serves the built React app, so one URL opens the whole sof
 - Live URL: _add your Render link here after deploying_
 - Free hosting sleeps when idle (first load can take about a minute) and resets the database on restart; demo accounts are re-created automatically.
 - Local run is unchanged: `start-demo.bat`.
+
+## Online demo deployment (Render)
+...
+- Live URL: - Live URL: https://palmpay-gfmm.onrender.com
