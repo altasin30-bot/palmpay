@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: palmpay
+    runtime: python
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: cd server && gunicorn wsgi:app --workers 1 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: PALMPAY_JWT_SECRET
+        generateValue: true
