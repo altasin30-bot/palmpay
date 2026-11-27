@@ -1,14 +1,32 @@
 from core import *
 
+@app.get('/api/customer/verification')
+@auth_required(roles=['customer'])
+def get_verification_setting():
+    row = get_db().execute("SELECT verification_enabled FROM users WHERE id=? AND role='customer'", (request.current_user['id'],)).fetchone()
+    if not row: return jsonify({'error':'Customer not found'}), 404
+    return jsonify({'enabled': bool(row['verification_enabled'])})
+
+@app.put('/api/customer/verification')
+@auth_required(roles=['customer'])
+def update_verification_setting():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {'enabled'} or not isinstance(data['enabled'], bool):
+        return jsonify({'error':'Provide enabled as true or false'}), 400
+    db = get_db()
+    db.execute("UPDATE users SET verification_enabled=? WHERE id=? AND role='customer'", (int(data['enabled']),request.current_user['id']))
+    db.commit()
+    return jsonify({'enabled':data['enabled']})
+
 @app.get('/api/admin/settings')
 @auth_required(roles=['admin'])
 def settings_get():
-    db=get_db(); return jsonify({r['name']:r['value'] for r in db.execute("SELECT * FROM settings WHERE name!='session_epoch'")})
+    db=get_db(); return jsonify({r['name']:r['value'] for r in db.execute("SELECT * FROM settings WHERE name NOT IN ('session_epoch','approval_threshold_p')")})
 
 @app.post('/api/admin/settings')
 @auth_required(roles=['admin'])
 def settings_save():
-    data=request.get_json(silent=True) or {}; allowed={'approval_threshold_p','per_payment_limit_p','daily_limit_p','scanner_mode','match_cutoff'}; changes={}
+    data=request.get_json(silent=True) or {}; allowed={'per_payment_limit_p','daily_limit_p','scanner_mode','match_cutoff'}; changes={}
     try:
         for k,v in data.items():
             if k not in allowed: raise ValueError('Unknown setting')
@@ -130,7 +148,7 @@ def reset_demo():
     if request.remote_addr not in ('127.0.0.1','::1'): return jsonify({'error':'Demo reset is restricted to local access'}),403
     db=get_db(); db.execute('BEGIN IMMEDIATE')
     db.execute('DROP TRIGGER IF EXISTS ledger_no_delete');db.execute('DROP TRIGGER IF EXISTS ledger_no_update')
-    for table in ('refunds','payment_requests','ledger','scan_events','login_failures','transactions','bills','palm_templates','users','settings'):
+    for table in ('refunds','payment_requests','ledger','scan_events','login_failures','transactions','bills','palm_templates','demo_devices','users','settings'):
         db.execute('DELETE FROM '+table)
     db.execute("DELETE FROM sqlite_sequence WHERE name IN ('users','transactions','bills','palm_templates','payment_requests')")
     db.commit(); init_db()

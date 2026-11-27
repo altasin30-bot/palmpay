@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Fingerprint, Receipt, BarChart3, TrendingUp, Wallet } from "lucide-react";
+import { Users, Fingerprint, Receipt, BarChart3, TrendingUp, Wallet, MapPin } from "lucide-react";
 import { api } from "../../api.js";
 import StatCard from "../../components/StatCard.jsx";
 
@@ -8,8 +8,10 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState(null);
   const [txs, setTxs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [devices, setDevices] = useState(null);
 
   useEffect(() => {
+    api.adminDevices().then(setDevices).catch(() => setDevices(null));
     Promise.all([api.adminReports(), api.transactions()])
       .then(([r, t]) => {
         setReports(r);
@@ -34,6 +36,8 @@ export default function AdminDashboard() {
         <StatCard icon={Receipt} label="Total Transactions" value={reports.transactions.total} accent="rose" />
         <StatCard icon={Users}   label="Customers"           value={reports.users.customers}     accent="brand" />
       </div>
+
+      <Link to="/admin/devices" className="block"><StatCard icon={MapPin} label="Simulated active devices (not live)" value={devices ? devices.simulated_active_count : "—"} accent="brand" /></Link>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link to="/admin/users" className="bg-white rounded-xl border border-slate-200 p-6 hover:border-brand-400 transition">

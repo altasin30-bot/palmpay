@@ -1,3 +1,4 @@
+from contextlib import closing
 import os,sys,tempfile,unittest,sqlite3,datetime
 sys.path.insert(0,os.path.dirname(os.path.dirname(__file__)))
 import app, core
@@ -11,6 +12,7 @@ class FeatureTests(unittest.TestCase):
  def payment(self,amount,key,mode='success'):return self.req('merchant','POST','/api/payments/process',{'amount':amount,'customer_id':3,'mode':mode,'idempotency_key':key})
  def bal(self):return self.req('customer','GET','/api/wallet/balance').json['balance']
  def test_pin_fallback(self):
+  self.req('customer','PUT','/api/customer/verification',{'enabled':False})
   self.assertEqual(self.payment(500,'scan-fail-key0001','poor_lighting').status_code,400)
   fallback=self.payment(500,'fallback-key-0001','pin_fallback');self.assertEqual(fallback.json['status'],'pending');rid=fallback.json['request_id'];self.assertEqual(self.bal(),5000)
   self.assertEqual(self.req('merchant','POST',f'/api/payments/{rid}/confirm',{'code':'123456'}).status_code,400)
@@ -29,7 +31,7 @@ class FeatureTests(unittest.TestCase):
   for i in range(3):self.assertEqual(self.req('customer','POST',f'/api/payments/{rid}/verify-pin',{'pin':'0000'}).status_code,400)
   self.assertEqual(self.req('merchant','GET',f'/api/payments/{rid}').json['status'],'cancelled');self.assertEqual(self.bal(),5000)
  def test_limits_and_settings(self):
-  self.assertEqual(self.req('admin','POST','/api/admin/settings',{'per_payment_limit_p':10000,'daily_limit_p':15000,'approval_threshold_p':5000}).status_code,200)
+  self.assertEqual(self.req('admin','POST','/api/admin/settings',{'per_payment_limit_p':10000,'daily_limit_p':15000}).status_code,200)
   self.assertEqual(self.payment(101,'over-limit-key001').status_code,400)
   r=self.payment(60,'limit-test-key001');self.assertEqual(r.json['status'],'pending')
   rid=r.json['request_id'];code=self.req('customer','GET','/api/payments/pending').json['requests'][0]['code']
@@ -37,13 +39,14 @@ class FeatureTests(unittest.TestCase):
   self.assertEqual(self.payment(100,'daily-limit-key01').status_code,400)
   self.req('admin','POST','/api/admin/settings',{'scanner_mode':'real'});self.assertEqual(self.payment(1,'real-mode-test001').status_code,503)
  def test_refund_payout_ledger(self):
+  self.req('customer','PUT','/api/customer/verification',{'enabled':False})
   r=self.payment('700.10','payment-one-key01');tx=r.json['tx_id']
   self.assertEqual(self.req('merchant','POST','/api/merchant/payout',{'amount':'100.05','idempotency_key':'payout-test-key01'}).status_code,200)
   self.assertEqual(self.req('merchant','POST',f'/api/merchant/refunds/{tx}').status_code,400)
   self.payment(200,'payment-two-key01')
   first=self.req('merchant','POST',f'/api/merchant/refunds/{tx}');second=self.req('merchant','POST',f'/api/merchant/refunds/{tx}')
   self.assertEqual(first.json['tx_id'],second.json['tx_id']);self.assertAlmostEqual(self.bal(),4800)
-  with sqlite3.connect(core.DB_PATH) as db:
+  with closing(sqlite3.connect(core.DB_PATH)) as db, db:
    for uid,wallet in db.execute('SELECT id,wallet_p FROM users'):
     total=db.execute('SELECT COALESCE(SUM(delta_p),0) FROM ledger WHERE user_id=?',(uid,)).fetchone()[0];self.assertEqual(wallet,total)
  def test_lock_report_reset(self):

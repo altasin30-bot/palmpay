@@ -22,6 +22,7 @@ import AdminDashboard from "./pages/admin/Dashboard.jsx";
 import AdminUsers     from "./pages/admin/Users.jsx";
 import AdminBiometric from "./pages/admin/Biometric.jsx";
 import AdminReports   from "./pages/admin/Reports.jsx";
+import AdminDevices   from "./pages/admin/Devices.jsx";
 
 import Layout from "./components/Layout.jsx";
 
@@ -58,6 +59,7 @@ export default function App() {
       <Route path="/admin/settings" element={<RoleRoute role="admin"><AdminSettings /></RoleRoute>} />
       {/* Admin */}
       <Route path="/admin" element={<RoleRoute role="admin"><AdminDashboard /></RoleRoute>} />
+      <Route path="/admin/devices" element={<RoleRoute role="admin"><AdminDevices /></RoleRoute>} />
       <Route path="/admin/users" element={<RoleRoute role="admin"><AdminUsers /></RoleRoute>} />
       <Route path="/admin/biometric" element={<RoleRoute role="admin"><AdminBiometric /></RoleRoute>} />
       <Route path="/admin/reports" element={<RoleRoute role="admin"><AdminReports /></RoleRoute>} />

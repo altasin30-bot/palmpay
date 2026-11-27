@@ -9,8 +9,8 @@ This is a local educational demo. A green test or simulated scan is not proof of
 | 3 | Server serializes requests and uses a stable key. Terminal retains the key and outcome in the same tab across reloads; the operator must re-enter the same details to retry after a lost response. A deliberate new payment uses a new key. |
 | 4 | Charge confirmation and a printable browser receipt are provided. |
 | 5 | Configurable admin per-payment and daily limits; the daily limit counts gross successful payments in Bangladesh time and is rechecked at completion. |
-| 6 | Configurable threshold defaults to over ৳1,000; customer sees an approval request with a code, merchant enters it, with two-minute expiry, decline, three-attempt cancellation and notices for both sides. This is a local web demo, not a mobile push notification. Splitting payments can avoid the per-payment threshold. |
-| 7 | Four-digit PINs are hashed and hidden. After a failed simulated scan, merchant can request fallback; customer enters PIN privately. Larger fallback payments additionally need the code. The demo does not protect against a compromised browser/server. |
+| 6 | **Updated behavior:** each customer controls Verification On/Off for all new demo payments, default On. On requires an approval code; Off requires no code. Pending requests retain their original rule. The previous admin threshold no longer applies. Codes expire in two minutes; decline and three wrong attempts cancel. This local web demo is not a mobile push notification. Turning Off reduces protection. |
+| 7 | Four-digit PINs are hashed and hidden. After a failed simulated scan, merchant can request fallback; customer enters PIN privately. Fallback payments also need the code when Verification is On; when Off, PIN is still required. The demo does not protect against a compromised browser/server. |
 | 8 | JWT subjects are strings; tests run with PyJWT 2.15.1. |
 | 9 | `server/config.py` and environment overrides hold settings; random local key, debug off, restricted local CORS. |
 | 10 | Basic SQLite-backed login throttling and an HttpOnly SameSite cookie replace JavaScript-readable tokens. Not production-grade abuse prevention or a complete CSRF/security audit. |
@@ -34,5 +34,9 @@ This is a local educational demo. A green test or simulated scan is not proof of
 | 28 | Backend split into core, scanner, route and feature modules. |
 | 29 | Automated tests cover earlier findings and new payment, security and money flows. Tests are not an independent security audit. |
 | 30 | `start-demo.bat` starts both local services after installing dependencies; admin has an explicitly confirmed local reset. The batch file has not been tested on a Windows PC in this environment. |
-| 31 | **Partial.** Deployment files are included (`render.yaml`, `build.sh`, gunicorn entry point `wsgi.py`) for a fake-data demo on Render. It is still a simulator and not safe for real money or real biometrics; live URL is recorded in `README.md` once deployed. |
+| 31 | **Not done.** No public hosting account, approved hosting target, or live deployment was supplied. Public deployment of this intentionally insecure simulator would be unsafe. |
 | 32 | Architecture and payment-flow Mermaid diagrams are in `README.md`. |
+
+## Verification preference update
+
+The customer dashboard saves an account-specific On/Off setting. New and migrated accounts default to On. On requires a code for every new payment regardless of amount; Off suppresses the code for new payments only. Existing pending requests and idempotent retries keep their original rule. The old admin threshold is retained in storage for compatibility but is inactive and hidden. This is an intentionally insecure local demo; never use real money or biometrics.

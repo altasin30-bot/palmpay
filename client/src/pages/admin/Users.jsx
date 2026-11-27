@@ -7,12 +7,16 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({name:"", email:"", merchant_shop:""});
+  const [editError, setEditError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   async function load() {
     setLoading(true);
-    const data = await api.adminUsers();
-    setUsers(data.users || []);
-    setLoading(false);
+    try { const data = await api.adminUsers(); setUsers(data.users || []); setLoadError(""); }
+    catch (err) { setLoadError(err.message); }
+    finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
 
@@ -27,6 +31,18 @@ export default function AdminUsers() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  function startEdit(user) {
+    setEditing(user); setForm({name:user.name, email:user.email, merchant_shop:user.merchant_shop || ""}); setEditError("");
+  }
+  async function saveEdit(event) {
+    event.preventDefault(); setBusyId(editing.id); setEditError("");
+    try {
+      await api.adminUpdateUser(editing.id, {name:form.name, email:form.email, ...(editing.role === "merchant" ? {merchant_shop:form.merchant_shop} : {})});
+      setEditing(null); await load();
+    } catch (err) { setEditError(err.message); }
+    finally { setBusyId(null); }
   }
 
   const filtered = users.filter((u) =>
@@ -58,7 +74,16 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {editing && <form onSubmit={saveEdit} className="bg-white rounded-xl border border-brand-200 p-5 space-y-3" aria-label="Edit user details">
+        <h3 className="font-semibold">Edit {editing.role} details</h3>
+        <label className="block text-sm">Name<input required maxLength={120} className="block w-full border rounded p-2" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+        <label className="block text-sm">Email<input required type="email" maxLength={254} className="block w-full border rounded p-2" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label>
+        {editing.role === "merchant" && <label className="block text-sm">Shop name<input required maxLength={120} className="block w-full border rounded p-2" value={form.merchant_shop} onChange={e=>setForm({...form,merchant_shop:e.target.value})}/></label>}
+        {editError && <p role="alert" className="text-rose-700">{editError}</p>}
+        <div className="flex gap-2"><button disabled={busyId===editing.id} className="bg-brand-600 text-white px-4 py-2 rounded">Save changes</button><button type="button" onClick={()=>setEditing(null)} className="border px-4 py-2 rounded">Cancel</button></div>
+      </form>}
+      {loadError && <p role="alert" className="text-rose-700">Could not load users: {loadError}</p>}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
         {loading ? (
           <div className="p-10 text-center text-slate-500">Loading…</div>
         ) : (
@@ -105,6 +130,7 @@ export default function AdminUsers() {
                     {new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(u.created_at) ? u.created_at : u.created_at + "Z").toLocaleDateString()}
                   </td>
                   <td className="px-6 py-3 text-right">
+                    {u.role !== "admin" && <button onClick={()=>startEdit(u)} className="text-brand-700 px-2 py-1 text-xs underline">Edit</button>}
                     {u.role === "merchant" && u.account_status === "pending" && <button onClick={async()=>{try{await api.approveMerchant(u.id);await load()}catch(e){alert(e.message)}}} className="text-emerald-700 px-2">Approve</button>}
                     {u.role !== "admin" && u.account_status !== "suspended" && (
                       <button

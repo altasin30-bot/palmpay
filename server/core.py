@@ -169,6 +169,8 @@ def init_db():
     cols = {r[1] for r in cur.execute("PRAGMA table_info(users)")}
     if "account_status" not in cols:
         cur.execute("ALTER TABLE users ADD COLUMN account_status TEXT NOT NULL DEFAULT 'active'")
+    if "verification_enabled" not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN verification_enabled INTEGER NOT NULL DEFAULT 1 CHECK(verification_enabled IN (0,1))")
     cols = {r[1] for r in cur.execute("PRAGMA table_info(transactions)")}
     if "method" not in cols:
         cur.execute("ALTER TABLE transactions ADD COLUMN method TEXT")
@@ -252,7 +254,59 @@ def init_db():
         if col not in {r[1] for r in cur.execute('PRAGMA table_info(payment_requests)')}: cur.execute('ALTER TABLE payment_requests ADD COLUMN '+col+' '+spec)
     cur.execute("CREATE TABLE IF NOT EXISTS login_failures(id INTEGER PRIMARY KEY,principal TEXT NOT NULL,created_at TEXT NOT NULL)")
     cur.execute("CREATE TABLE IF NOT EXISTS refunds(id INTEGER PRIMARY KEY, original_tx_id INTEGER NOT NULL UNIQUE, refund_tx_id INTEGER NOT NULL, created_at TEXT NOT NULL)")
+    cur.execute("""CREATE TABLE IF NOT EXISTS demo_devices (
+        id INTEGER PRIMARY KEY, device_code TEXT UNIQUE NOT NULL,
+        label TEXT NOT NULL, merchant_id INTEGER NOT NULL REFERENCES users(id),
+        location_name TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL,
+        demo_status TEXT NOT NULL CHECK(demo_status IN ('active','inactive'))
+    )""")
+    if seeded:
+        seed_additional_demo_data(conn)
     conn.commit(); conn.close()
+
+
+def seed_additional_demo_data(conn):
+    """Add synthetic accounts/devices once, without updating existing records.
+
+    Call only on fresh database creation or by explicit local opt-in script.
+    """
+    from functools import lru_cache
+    @lru_cache(maxsize=None)
+    def fixture_hash(value):
+        return bcrypt.hashpw(value.encode(), bcrypt.gensalt()).decode()
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    customers = [
+        ('Ayesha Khan', 'ayesha@palmpay.com'),
+        ('Karim Hasan', 'karim@palmpay.com'),
+    ]
+    merchants = [
+        ('Dhanmondi Demo Store', 'dhanmondi@palmpay.com', 'Dhanmondi Demo Store'),
+        ('Gulshan Demo Store', 'gulshan@palmpay.com', 'Gulshan Demo Store'),
+        ('Mirpur Demo Store', 'mirpur@palmpay.com', 'Mirpur Demo Store'),
+        ('Uttara Demo Store', 'uttara@palmpay.com', 'Uttara Demo Store'),
+    ]
+    for name, email in customers:
+        if conn.execute('SELECT 1 FROM users WHERE email=?', (email,)).fetchone():
+            continue
+        cur = conn.execute("INSERT INTO users(name,email,password_hash,role,pin,wallet_balance,wallet_p,created_at) VALUES(?,?,?,'customer',?,3000,300000,?)", (name,email,fixture_hash('Demo@123'),fixture_hash('1234'),now))
+        uid = cur.lastrowid
+        template = [round(random.uniform(-1,1),4) for _ in range(PALM_VECTOR_DIM)]
+        conn.execute("INSERT INTO palm_templates(user_id,template,scan_count,status,created_at) VALUES(?,?,3,'active',?)", (uid,encrypt_template(template),now))
+        conn.execute("INSERT INTO ledger(user_id,delta_p,kind,reference,created_at) VALUES(?,300000,'opening_balance','demo_seed',?)", (uid,now))
+    for name, email, shop in merchants:
+        if not conn.execute('SELECT 1 FROM users WHERE email=?', (email,)).fetchone():
+            conn.execute("INSERT INTO users(name,email,password_hash,role,merchant_shop,created_at) VALUES(?,?,?,'merchant',?,?)", (name,email,fixture_hash('Demo@123'),shop,now))
+    devices = [
+        ('DEMO-001','Demo terminal 1','shop@palmpay.com','Dhaka (sample)',23.8103,90.4125,'active'),
+        ('DEMO-002','Demo terminal 2','dhanmondi@palmpay.com','Dhanmondi (sample)',23.7461,90.3742,'active'),
+        ('DEMO-003','Demo terminal 3','gulshan@palmpay.com','Gulshan (sample)',23.7925,90.4078,'active'),
+        ('DEMO-004','Demo terminal 4','mirpur@palmpay.com','Mirpur (sample)',23.8223,90.3654,'active'),
+        ('DEMO-005','Demo terminal 5','uttara@palmpay.com','Uttara (sample)',23.8759,90.3795,'inactive'),
+    ]
+    for code, label, email, location, lat, lon, status in devices:
+        merchant = conn.execute("SELECT id FROM users WHERE email=? AND role='merchant'", (email,)).fetchone()
+        if merchant:
+            conn.execute('INSERT OR IGNORE INTO demo_devices(device_code,label,merchant_id,location_name,latitude,longitude,demo_status) VALUES(?,?,?,?,?,?,?)', (code,label,merchant[0],location,lat,lon,status))
 
 
 def setting(db, name):

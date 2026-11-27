@@ -1,27 +1,21 @@
-# PalmPay test report
+# PalmPay test report — verification toggle update
 
-## Summary
+## Local verification results
 
-The following checks were run in an isolated Linux environment with Python 3.13.15 and Node.js 24.22.1. Only simulated data was used.
+Tests were run with synthetic data in an isolated Linux environment, with Python 3.13 and Node.js 24. The updated package includes:
 
-| Suite | Result | Scope |
+| Check | Result | Scope |
 | --- | --- | --- |
-| Backend combined suite | 30 passed, 0 failed | 15 existing API/integration tests and 15 newly added unit tests |
-| Frontend API-wrapper unit tests | 8 passed, 0 failed | Newly added tests using mocked browser storage and network responses |
-| Frontend build | Passed | Vite production build; a large-bundle warning was emitted |
+| Backend automated suite | 42 passed, 0 failed | Existing tests plus seven customer-verification tests |
+| Frontend API-wrapper tests | 9 passed, 0 failed | Includes verification GET and PUT request construction |
+| Frontend build | Passed | Vite emitted a large-bundle warning |
+| Two-session browser smoke test | Passed | Default On: small payment requires and accepts a code. Off: setting persists after reload and a larger payment completes without a code. On can be restored. |
 
-Backend statement coverage for the combined suite was 85% (688 statements, 105 missed). This includes both the original integration tests and the new unit tests; it is not branch coverage or a security guarantee. Coverage of bills and transaction history was lower than the total. Some existing tests emitted SQLite unclosed-connection ResourceWarnings, although the suite passed.
+Backend tests cover customer-only access and input validation, different customers' independent settings, default and migrated database behavior, small and large payments with verification On, Off payments and duplicate retries, pending requests retaining their original rules, PIN fallback when Off, and reset restoring the default. The older threshold-based payment tests were updated to choose the required On/Off state explicitly. No coverage percentage was measured for this build.
 
-## New test files
+## Run tests
 
-- `server/tests/test_units.py`: amount validation and poisha conversion; vector generation, averaging and similarity; template encryption; simulated scanner modes; and real-scanner fail-closed behavior.
-- `client/tests/api.test.mjs`: session storage, login and confirmation request construction, API errors and network failures. Uses Node's built-in test runner; no additional test package is required.
-
-## Run on Windows
-
-Open Command Prompt in the extracted `palmpay` folder. Install Python 3.10 or later and Node.js (the frontend tests were verified on Node 24).
-
-Backend (includes both existing and new tests):
+From an extracted project folder on Windows, install Python 3.10+ and Node.js, then open a Command Prompt:
 
 ```bat
 cd server
@@ -31,22 +25,15 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-In a second Command Prompt, from the extracted `palmpay` folder, run the frontend unit tests:
+In another Command Prompt from the project folder:
 
 ```bat
 cd client
 node --test tests/api.test.mjs
-```
-
-Optionally build the frontend:
-
-```bat
 npm ci
 npm run build
 ```
 
-## Limitations and next steps
+## Limitations
 
-These tests do not test React components in a browser, real scanner hardware, liveness detection, real biometric data, real payment providers, concurrency under load, or deployment. Tests were not run on Windows. Passing tests and coverage do not prove the app is secure or production-ready. Add browser/UI tests, financial retry and concurrency tests, authentication/security tests, and hardware-adapter tests as those components are developed. Continue using this build only as a local simulation.
-
-This package adds tests and this report; it does not change the application source. The test run created local files during execution, but generated keys, databases, dependencies, build outputs and coverage data are not included in the ZIP.
+Testing does not prove production security, biometric accuracy, or payment compliance. Real hardware, real payment providers, a production deployment, accessibility, and Windows execution were not tested. The local scanner and financial flows are simulations; use only synthetic data and do not deploy the demo publicly. Turning Verification Off makes simulated payments easier to authorize without customer approval.

@@ -1,7 +1,13 @@
+from contextlib import closing
+import atexit
 import os, tempfile, unittest, sqlite3, sys, datetime
 sys.path.insert(0,os.path.dirname(os.path.dirname(__file__)))
-tmp=tempfile.TemporaryDirectory(); os.environ['PALMPAY_DB']=os.path.join(tmp.name,'test.db')
+tmp=tempfile.TemporaryDirectory(); atexit.register(tmp.cleanup); os.environ['PALMPAY_DB']=os.path.join(tmp.name,'test.db')
 import app as mod
+import core
+# Discovery can import app before this module; always point both names at our temporary DB.
+core.DB_PATH = os.path.join(tmp.name, 'test.db')
+mod.DB_PATH = core.DB_PATH
 mod.init_db()
 mod.app.testing=True
 class DemoTests(unittest.TestCase):
@@ -17,14 +23,16 @@ class DemoTests(unittest.TestCase):
  def test_01_no_pin_exposure(self):
   u=self.req('customer','GET','/api/auth/me').json['user']; self.assertNotIn('pin',u); self.assertTrue(u['pin_set'])
   users=self.req('admin','GET','/api/admin/users').json['users']; self.assertTrue(all('pin' not in x for x in users))
-  with sqlite3.connect(mod.DB_PATH) as db:
+  with closing(sqlite3.connect(mod.DB_PATH)) as db, db:
    self.assertTrue(db.execute('select pin from users where id=3').fetchone()[0].startswith('$2'))
    self.assertFalse(db.execute('select template from palm_templates').fetchone()[0].startswith('['))
  def test_02_small_payment_idempotency(self):
+  self.req('customer','PUT','/api/customer/verification',{'enabled':False})
   before=self.balance(); r=self.new(1000,'small-test-key-0001');self.assertEqual(r.status_code,200);self.assertEqual(r.json['status'],'success')
   same=self.new(1000,'small-test-key-0001');self.assertEqual(same.json['tx_id'],r.json['tx_id']);self.assertEqual(self.balance(),before-1000)
   self.assertEqual(self.new(999,'small-test-key-0001').status_code,409)
  def test_03_approval(self):
+  self.req('customer','PUT','/api/customer/verification',{'enabled':True})
   before=self.balance(); r=self.new(1001,'approval-key-00001'); self.assertEqual(r.json['status'],'pending');self.assertNotIn('code',r.json);self.assertEqual(before,self.balance())
   request_id=r.json['request_id']; pending=self.req('customer','GET','/api/payments/pending').json['requests']; code=next(x['code'] for x in pending if x['request_id']==request_id)
   wrong=self.req('merchant','POST',f'/api/payments/{request_id}/confirm',{'code':'bad'});self.assertEqual(wrong.status_code,400);self.assertEqual(self.balance(),before)
@@ -37,7 +45,7 @@ class DemoTests(unittest.TestCase):
   self.assertEqual(self.req('merchant','GET',f'/api/payments/{rid}').json['status'],'cancelled');self.assertEqual(self.balance(),before)
  def test_05_expiry_and_rejections(self):
   r=self.new(1001,'expired-key-00001');rid=r.json['request_id'];
-  with sqlite3.connect(mod.DB_PATH) as db: db.execute("update payment_requests set expires_at=? where id=?",('2000-01-01T00:00:00+00:00',rid))
+  with closing(sqlite3.connect(mod.DB_PATH)) as db, db: db.execute("update payment_requests set expires_at=? where id=?",('2000-01-01T00:00:00+00:00',rid))
   self.assertEqual(self.req('merchant','GET',f'/api/payments/{rid}').json['status'],'expired')
   for mode in ('unrecognized','poor_lighting'): self.assertEqual(self.new(20,'failed-'+mode+'-000',mode).status_code,400)
   self.assertEqual(self.new('NaN','invalid-amount-0001').status_code,400)
@@ -52,7 +60,7 @@ class DemoTests(unittest.TestCase):
  def test_07_reenroll_invalid_topup(self):
   self.assertEqual(self.req('customer','POST','/api/palm/enroll',{'samples':[1,2,3]}).status_code,400)
   self.assertEqual(self.req('customer','POST','/api/palm/enroll',{}).status_code,200)
-  with sqlite3.connect(mod.DB_PATH) as db:self.assertEqual(db.execute("select count(*) from palm_templates where user_id=3 and status='active'").fetchone()[0],1)
+  with closing(sqlite3.connect(mod.DB_PATH)) as db, db:self.assertEqual(db.execute("select count(*) from palm_templates where user_id=3 and status='active'").fetchone()[0],1)
   self.assertEqual(self.req('customer','POST','/api/wallet/topup',{'amount':'abc','idempotency_key':'topup-test-key000'}).status_code,400)
   before=self.balance(); data={'amount':100,'method':'nagad','idempotency_key':'topup-test-key000'}
   self.assertEqual(self.req('customer','POST','/api/wallet/topup',data).status_code,200);self.assertEqual(self.req('customer','POST','/api/wallet/topup',data).status_code,200);self.assertEqual(self.balance(),before+100)

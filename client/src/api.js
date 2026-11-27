@@ -37,6 +37,10 @@ export const api = {
   me:       ()        => request("GET",  "/api/auth/me"),
   logout:   ()        => request("POST", "/api/auth/logout"),
 
+  // CUSTOMER VERIFICATION PREFERENCE
+  verificationSetting: () => request("GET", "/api/customer/verification"),
+  setVerification: enabled => request("PUT", "/api/customer/verification", {enabled}),
+
   // PALM
   palmEnroll: ()              => request("POST", "/api/palm/enroll"),
   palmDelete: () => request("DELETE", "/api/palm/enroll"),
@@ -76,6 +80,8 @@ export const api = {
   approveMerchant: (id) => request("POST", `/api/admin/users/${id}/approve`),
 
   // ADMIN
+  adminDevices:    ()         => request("GET", "/api/admin/devices"),
+  adminUpdateUser: (id, data) => request("PATCH", `/api/admin/users/${id}`, data),
   adminUsers:      ()         => request("GET", "/api/admin/users"),
   adminDeleteUser: (id)       => request("DELETE", `/api/admin/users/${id}`),
   adminBiometric:  ()         => request("GET", "/api/admin/biometric"),

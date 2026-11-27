@@ -56,7 +56,7 @@ def payments_process():
             if old["merchant_id"] != merchant or old["customer_id"] != customer_id or not same_bill or not same_manual:
                 db.rollback(); return jsonify({"error":"Payment key already used for different details"}),409
             result=request_result(old); db.commit(); return jsonify(result)
-        customer=db.execute("SELECT u.id,u.name,u.wallet_p,p.template FROM users u JOIN palm_templates p ON p.user_id=u.id WHERE u.id=? AND u.role='customer' AND u.account_status='active' AND p.status='active'",(customer_id,)).fetchone()
+        customer=db.execute("SELECT u.id,u.name,u.wallet_p,u.verification_enabled,p.template FROM users u JOIN palm_templates p ON p.user_id=u.id WHERE u.id=? AND u.role='customer' AND u.account_status='active' AND p.status='active'",(customer_id,)).fetchone()
         if not customer: db.rollback(); return jsonify({"error":"Active enrolled customer not found"}),400
         if mode=='pin_fallback':
             if setting(db,'scanner_mode') != 'demo': db.rollback(); return jsonify({'error':'PIN fallback unavailable until a real scanner is integrated'}),503
@@ -92,7 +92,7 @@ def payments_process():
         limit_error=spending_error(db,customer_id,poisha(amount))
         if limit_error: db.rollback(); return jsonify({"error":limit_error}),400
         now=datetime.datetime.now(datetime.timezone.utc); expiry=(now+datetime.timedelta(minutes=2)).isoformat()
-        code=f"{secrets.randbelow(1000000):06d}" if poisha(amount) > int(setting(db,"approval_threshold_p")) else None
+        code=f"{secrets.randbelow(1000000):06d}" if customer["verification_enabled"] else None
         cur=db.execute("INSERT INTO payment_requests(merchant_id,customer_id,bill_id,amount,description,idem,similarity,status,code_encrypted,expires_at,created_at) VALUES(?,?,?,?,?,?,?,'pending',?,?,?)",(merchant,customer_id,bill_id,amount,desc,idem,round(score,4),fernet.encrypt(code.encode()).decode() if code else None,expiry,now.isoformat()))
         db.execute("UPDATE payment_requests SET amount_p=?,auth_method=? WHERE id=?",(poisha(amount),'pin' if mode=='pin_fallback' else 'palm',cur.lastrowid))
         r=db.execute("SELECT * FROM payment_requests WHERE id=?",(cur.lastrowid,)).fetchone()

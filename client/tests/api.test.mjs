@@ -76,3 +76,15 @@ test('network errors propagate to the caller', async () => {
   globalThis.fetch = async () => { throw new Error('Network unavailable'); };
   await assert.rejects(api.me(), /Network unavailable/);
 });
+
+test('verification preference uses authenticated GET and boolean PUT', async () => {
+  const calls = [];
+  globalThis.fetch = async (...args) => { calls.push(args); return {ok: true, json: async () => ({enabled: false})}; };
+  await api.verificationSetting();
+  await api.setVerification(false);
+  assert.equal(calls[0][0], '/api/customer/verification');
+  assert.equal(calls[0][1].method, 'GET');
+  assert.equal(calls[1][1].method, 'PUT');
+  assert.deepEqual(JSON.parse(calls[1][1].body), {enabled: false});
+  assert.equal(calls[1][1].credentials, 'same-origin');
+});

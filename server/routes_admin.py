@@ -102,3 +102,53 @@ def admin_reports():
     })
 
 
+
+
+@app.get('/api/admin/devices')
+@auth_required(roles=['admin'])
+def admin_demo_devices():
+    """Only synthetic device inventory; no real connectivity is measured."""
+    rows = get_db().execute("""SELECT d.id,d.device_code,d.label,d.location_name,d.latitude,
+        d.longitude,d.demo_status,u.id AS merchant_id,u.name AS merchant_name,
+        u.email AS merchant_email,u.merchant_shop,u.account_status AS merchant_status
+        FROM demo_devices d JOIN users u ON u.id=d.merchant_id ORDER BY d.device_code""").fetchall()
+    devices = [dict(r) for r in rows]
+    return jsonify({'devices': devices, 'simulated_active_count': sum(d['demo_status']=='active' for d in devices), 'simulated': True})
+
+
+@app.patch('/api/admin/users/<int:user_id>')
+@auth_required(roles=['admin'])
+def admin_update_user(user_id):
+    """Edit a customer or merchant's basic contact details in the local demo."""
+    import re
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) - {'name','email','merchant_shop'}:
+        return jsonify({'error':'Provide only name, email and merchant shop'}), 400
+    name, email = data.get('name'), data.get('email')
+    if not isinstance(name,str) or not name.strip() or len(name.strip()) > 120:
+        return jsonify({'error':'Name is required and must be at most 120 characters'}), 400
+    if not isinstance(email,str):
+        return jsonify({'error':'A valid email is required'}), 400
+    email = email.strip().lower()
+    if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
+        return jsonify({'error':'A valid email is required'}), 400
+    db = get_db()
+    user = db.execute('SELECT role FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user: return jsonify({'error':'User not found'}), 404
+    if user['role'] not in ('customer','merchant'):
+        return jsonify({'error':'Only customer and merchant details can be edited here'}), 403
+    shop = data.get('merchant_shop')
+    if user['role'] == 'merchant':
+        if not isinstance(shop,str) or not shop.strip() or len(shop.strip())>120:
+            return jsonify({'error':'Merchant shop is required and must be at most 120 characters'}), 400
+        shop = shop.strip()
+    elif shop not in (None,''):
+        return jsonify({'error':'Customers cannot have a merchant shop'}), 400
+    else: shop = None
+    try:
+        db.execute('UPDATE users SET name=?,email=?,merchant_shop=? WHERE id=?', (name.strip(),email,shop,user_id))
+        db.commit()
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({'error':'Email is already in use'}), 409
+    return jsonify({'message':'User details updated'})

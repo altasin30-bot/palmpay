@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Hand, Wallet, Receipt, Scan, Store, PlusCircle, CreditCard,
-  Users, Fingerprint, BarChart3, LogOut, ShieldCheck,
+  Users, Fingerprint, BarChart3, LogOut, ShieldCheck, MapPin,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -24,6 +24,7 @@ const MENU = {
   ],
   admin: [
     { to: "/admin",            label: "Dashboard",          icon: BarChart3 },
+    { to: "/admin/devices",    label: "Demo Devices",        icon: MapPin },
     { to: "/admin/users",      label: "Users & Merchants",  icon: Users },
     { to: "/admin/biometric",  label: "Biometric Metadata", icon: Fingerprint },
     { to: "/admin/reports",    label: "Reports",            icon: BarChart3 },
@@ -36,7 +37,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const items = MENU[user.role] || [];
   const [bangla,setBangla]=useState(()=>localStorage.getItem('palmpay_lang')==='bn');
-  const labels={'Dashboard':'ড্যাশবোর্ড','Top Up':'টপ আপ','Transactions':'লেনদেন','Enroll Palm':'পাম নিবন্ধন','Create Bill':'বিল তৈরি','Palm Payment':'পাম পেমেন্ট','Balance & payouts':'ব্যালেন্স ও পেআউট','Users & Merchants':'ব্যবহারকারী ও মার্চেন্ট','Biometric Metadata':'বায়োমেট্রিক তথ্য','Reports':'রিপোর্ট','Settings & alerts':'সেটিংস ও সতর্কতা'};
+  const labels={'Dashboard':'ড্যাশবোর্ড','Demo Devices':'ডেমো ডিভাইস','Top Up':'টপ আপ','Transactions':'লেনদেন','Enroll Palm':'পাম নিবন্ধন','Create Bill':'বিল তৈরি','Palm Payment':'পাম পেমেন্ট','Balance & payouts':'ব্যালেন্স ও পেআউট','Users & Merchants':'ব্যবহারকারী ও মার্চেন্ট','Biometric Metadata':'বায়োমেট্রিক তথ্য','Reports':'রিপোর্ট','Settings & alerts':'সেটিংস ও সতর্কতা'};
   const [pending, setPending] = useState([]);
   const [recent,setRecent]=useState([]), [pin,setPin]=useState("");
   useEffect(() => {

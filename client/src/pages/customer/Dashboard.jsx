@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Wallet, Fingerprint, Receipt, PlusCircle, ShieldCheck } from "lucide-react";
 import { api } from "../../api.js";
@@ -10,14 +10,49 @@ export default function CustomerDashboard() {
   const [balance, setBalance]     = useState(0);
   const [txs, setTxs]              = useState([]);
   const [loading, setLoading]     = useState(true);
+  const [verification, setVerification] = useState(null);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const verificationRequest = useRef(0);
 
   useEffect(() => {
-    Promise.all([api.walletBalance(), api.transactions()])
+    let active = true;
+    const load = () => { const request = ++verificationRequest.current; api.verificationSetting().then(x => { if (active && request === verificationRequest.current) setVerification(x.enabled); }).catch(() => { if (active && request === verificationRequest.current) { setVerification(null); setVerificationMessage('Could not load verification setting. Refresh the page to retry.'); } }); };
+    load();
+    window.addEventListener('focus', load);
+    return () => { active = false; window.removeEventListener('focus', load); };
+  }, []);
+
+  async function changeVerification() {
+    const next = !verification;
+    if (!next && !window.confirm('Turn verification off? New demo payments can complete without a customer approval code. This is less safe.')) return;
+    ++verificationRequest.current;
+    setVerificationBusy(true);
+    setVerificationMessage('');
+    try {
+      const result = await api.setVerification(next);
+      setVerification(result.enabled);
+      setVerificationMessage(`Verification is ${result.enabled ? 'On' : 'Off'} for new payments.`);
+    } catch (err) {
+      setVerificationMessage(`Could not save setting: ${err.message}`);
+      try { const current = await api.verificationSetting(); setVerification(current.enabled); }
+      catch { setVerification(null); }
+    } finally { setVerificationBusy(false); }
+  }
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => Promise.all([api.walletBalance(), api.transactions()])
       .then(([b, t]) => {
+        if (!active) return;
         setBalance(b.balance);
         setTxs(t.transactions || []);
       })
-      .finally(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    refresh();
+    const timer = setInterval(refresh, 3000);
+    return () => { active = false; clearInterval(timer); };
   }, []);
 
   const lastTx = txs.slice(0, 5);
@@ -29,6 +64,20 @@ export default function CustomerDashboard() {
         <StatCard icon={Receipt}    label="Total Transactions" value={txs.length}  accent="blue" />
         <StatCard icon={ShieldCheck} label="PIN fallback" value={user.pin_set ? "Set" : "Not set"} accent={user.pin_set ? "brand" : "amber"} />
       </div>
+
+      <section className="bg-white rounded-xl border border-slate-200 p-6" aria-labelledby="verification-title">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <h2 id="verification-title" className="font-semibold text-slate-800">Payment verification</h2>
+            <p className="text-sm text-slate-600 mt-1">On: a six-digit approval code is required for every new demo payment. Off: no approval code is required. PIN fallback still requires your PIN.</p>
+            <p className="text-sm text-amber-800 mt-2">Turning verification off reduces protection. Changes do not affect requests already pending. Demo only — never use real money or biometrics.</p>
+          </div>
+          <button type="button" role="switch" aria-checked={verification === true} aria-label="Payment verification" disabled={verification === null || verificationBusy} onClick={changeVerification} className={`min-w-32 rounded-lg px-4 py-3 font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-600 disabled:opacity-50 ${verification ? 'bg-emerald-700' : 'bg-slate-600'}`}>
+            Verification {verification === null ? '…' : verification ? 'On' : 'Off'}
+          </button>
+        </div>
+        <p role="status" aria-live="polite" className="text-sm text-slate-700 mt-2">{verificationMessage}</p>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Quick actions */}
