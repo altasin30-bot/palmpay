@@ -1,6 +1,6 @@
 # PalmPay — local educational demo
 
-**Do not use real money or real biometric data, and do not deploy this build publicly.** Scans, top-ups and payouts are simulated; demo controls can impersonate a customer. This is a capstone prototype, not production payment software. See `IMPLEMENTATION_STATUS.md` for a numbered, honest status of all 32 requirements and remaining gaps.
+**Do not use real money or real biometric data.** The online version is a demo deployment with fake data only (see "Online demo deployment" below); do not share its demo passwords publicly. Scans, top-ups and payouts are simulated; demo controls can impersonate a customer. This is a capstone prototype, not production payment software. See `IMPLEMENTATION_STATUS.md` for a numbered, honest status of all 32 requirements and remaining gaps.
 
 ## Run on Windows
 
@@ -127,3 +127,14 @@ venv\Scripts\python.exe app.py
 ```
 
 Restart any running backend first (Ctrl+C). If an error persists, inspect the traceback in the PalmPay API window. Do not post passwords, PINs or approval codes.
+
+## Online demo deployment (Render)
+
+The Flask server also serves the built React app, so one URL opens the whole software.
+
+- `render.yaml` and `build.sh` describe the Render web service (build the frontend, install backend, start with gunicorn).
+- `.github/workflows/ci.yml` runs backend tests, frontend tests and the frontend build on every push.
+- Live URL: https://palmpay-gfmm.onrender.com
+- Free hosting sleeps when idle (first load can take about a minute) and resets the database on restart; demo accounts and devices are re-created automatically.
+- The Demo Devices map needs an internet connection for map tiles.
+- Local run is unchanged: `start-demo.bat`.

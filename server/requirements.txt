@@ -8,3 +8,6 @@ bcrypt==4.2.0
 cryptography>=42,<51
 # Required on Windows, which may not provide an IANA time-zone database.
 tzdata>=2024.1,<2027
+
+# Production web server for the deployed demo (Render)
+gunicorn>=22,<24

@@ -34,7 +34,7 @@ This is a local educational demo. A green test or simulated scan is not proof of
 | 28 | Backend split into core, scanner, route and feature modules. |
 | 29 | Automated tests cover earlier findings and new payment, security and money flows. Tests are not an independent security audit. |
 | 30 | `start-demo.bat` starts both local services after installing dependencies; admin has an explicitly confirmed local reset. The batch file has not been tested on a Windows PC in this environment. |
-| 31 | **Not done.** No public hosting account, approved hosting target, or live deployment was supplied. Public deployment of this intentionally insecure simulator would be unsafe. |
+| 31 | **Partial.** Deployment files are included (`render.yaml`, `build.sh`, gunicorn entry point `wsgi.py`) for a fake-data demo on Render. It is still a simulator and not safe for real money or real biometrics; live URL is recorded in `README.md`. |
 | 32 | Architecture and payment-flow Mermaid diagrams are in `README.md`. |
 
 ## Verification preference update
